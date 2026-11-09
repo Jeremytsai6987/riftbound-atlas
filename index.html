@@ -6,7 +6,7 @@
 <section id="cardsSection"><div class="row"><input id="query" placeholder="搜尋卡號、英文名稱" style="flex:1;min-width:200px"><select id="set"><option value="">全部系列</option></select><button id="reload">重新載入卡表</button></div><p id="cardStatus" class="hint">正在嘗試讀取 Riot 官方卡表…</p><div id="gallery" class="grid"></div><div style="text-align:center;margin:20px"><button id="more" class="hide">更多卡片</button></div></section>
 <section id="inventorySection" class="hide"><div class="panel"><h2>📦 我的卡牌倉庫</h2><p class="hint">用完整印刷卡號作為唯一識別碼；數量會先存在本機，登入後可同步到私人 Supabase 帳戶。</p><div class="row"><input id="code" placeholder="卡號，如 OGN-001"><input id="name" placeholder="卡名（選填）"><button id="add" class="primary">＋ 登記一張</button></div><p id="count"></p><input id="inventoryQuery" placeholder="搜尋已收藏卡片"><div id="entries"></div></div><div class="panel"><h2>備份與還原</h2><div class="row"><button id="export">匯出 JSON</button><label>匯入 JSON <input id="import" type="file" accept=".json,application/json"></label></div></div></section>
 <footer class="muted">卡圖與文字歸 Riot Games 所有。本網站是非官方粉絲工具。部分地區瀏覽器可能因 CORS 無法讀取官方 API；未取得的語言文字不會捏造。法文朗讀使用裝置內建語音。</footer></main>
-<dialog id="detail"><div class="detail"><img id="big" alt="卡牌圖片"><div><div class="row" style="justify-content:space-between"><h2 id="detailTitle"></h2><button id="close">關閉 ✕</button></div><p id="meta"></p><div class="panel"><strong>📦 持有數量</strong><div class="row"><button id="minus">－</button><b id="qty">0</b><button id="plus">＋</button></div></div><div class="panel"><b>🇹🇼 繁體中文</b><p id="zh"></p></div><div class="panel"><b>🇬🇧 English</b> <button id="sayEn">🔊</button><p id="en"></p></div><div class="panel"><b>🇫🇷 Français</b> <button id="sayFr">🔊</button><button id="slowFr">🐢 慢速</button><button id="translateFr" title="把目前英文卡牌文字翻成法文（非官方翻譯）">🌐 翻成法文</button><p id="fr"></p><small class="hint" id="frNote"></small></div></div></div></dialog>
+<dialog id="detail"><div class="detail"><img id="big" alt="卡牌圖片"><div><div class="row" style="justify-content:space-between"><h2 id="detailTitle"></h2><button id="close">關閉 ✕</button></div><p id="meta"></p><div class="panel"><strong>📦 持有數量</strong><div class="row"><button id="minus">－</button><b id="qty">0</b><button id="plus">＋</button></div></div><div class="panel"><b>🇹🇼 繁體中文</b><p id="zh"></p></div><div class="panel"><b>🇬🇧 English</b> <button id="sayEn">🔊</button><p id="en"></p></div><div class="panel"><b>🇫🇷 Français</b> <button id="sayFr">🔊</button><button id="slowFr">🐢 慢速</button><select id="frenchVoice" title="選擇法文聲音"><option value="">自動選擇法文聲音</option></select><button id="translateFr" title="把目前英文卡牌文字翻成法文（非官方翻譯）">🌐 翻成法文</button><p id="fr"></p><small class="hint" id="frNote"></small></div></div></div></dialog>
 <script src="./supabase-config.js"></script><script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const $=id=>document.getElementById(id),STORE='riftbound-atlas-inventory-v1',BASE='https://content.publishing.riotgames.com/publishing-content/v2.0/public/channel/riftbound_website/list/riftbound_gallery_cards';
@@ -92,7 +92,32 @@ async function translateFrench(c){
 $('translateFr').onclick=()=>{if(current)translateFrench(current)};
 function openCard(c){current=c;$('big').src=imageOf(c);$('detailTitle').textContent=c.name||codeOf(c);$('meta').textContent=codeOf(c)+' · '+setOf(c);$('qty').textContent=count(codeOf(c));const z=zh.get(normalize(codeOf(c)));const enText=textOf(c);const zhText=textOf(z);const validChinese=!!z&&(z.name!==c.name||zhText!==enText);$('en').textContent=c.name+'\n'+(enText||'此卡未提供效果文字');$('zh').textContent=validChinese?z.name+'\n'+zhText:'⚠️ 此卡尚未取得繁體中文官方原文';$('detail').showModal();renderFrench(c)}
 $('close').onclick=()=>$('detail').close();$('plus').onclick=()=>current&&setCount(codeOf(current),count(codeOf(current))+1,current.name);$('minus').onclick=()=>current&&setCount(codeOf(current),count(codeOf(current))-1);
-function speak(id,lang,rate){if($(id).textContent.startsWith('⚠️'))return;if(!window.speechSynthesis)return alert('此瀏覽器不支援朗讀');speechSynthesis.cancel();const u=new SpeechSynthesisUtterance($(id).textContent);u.lang=lang;u.rate=rate;speechSynthesis.speak(u)}
+// Prefer installed natural-sounding French voices. Availability depends on the device.
+let frenchVoices=[];
+function refreshFrenchVoices(){
+ if(!('speechSynthesis' in window))return;
+ frenchVoices=speechSynthesis.getVoices().filter(v=>/^fr([-_]|$)/i.test(v.lang));
+ const chooser=$('frenchVoice'),old=chooser.value;
+ chooser.replaceChildren(new Option('自動選擇法文聲音',''));
+ for(const v of frenchVoices)chooser.add(new Option(v.name+' ('+v.lang+')',v.voiceURI));
+ chooser.value=frenchVoices.some(v=>v.voiceURI===old)?old:'';
+}
+if('speechSynthesis' in window){refreshFrenchVoices();speechSynthesis.addEventListener?.('voiceschanged',refreshFrenchVoices)}
+function speak(id,lang,rate){
+ if($(id).textContent.startsWith('⚠️'))return;
+ if(!('speechSynthesis' in window))return alert('此瀏覽器不支援朗讀');
+ speechSynthesis.cancel();
+ const text=$(id).textContent.replace(/⚠️.*$/gm,'').trim();
+ const u=new SpeechSynthesisUtterance(text);
+ u.lang=lang;u.rate=rate;u.pitch=1;
+ if(lang==='fr-FR'){
+   const chosen=frenchVoices.find(v=>v.voiceURI===$('frenchVoice').value);
+   u.voice=chosen||frenchVoices.find(v=>/^fr[-_]FR$/i.test(v.lang)&&/premium|enhanced|natural|neural/i.test(v.name))
+            ||frenchVoices.find(v=>/^fr[-_]FR$/i.test(v.lang))
+            ||frenchVoices[0]||null;
+ }
+ speechSynthesis.speak(u);
+}
 $('sayEn').onclick=()=>speak('en','en-US',.9);$('sayFr').onclick=()=>speak('fr','fr-FR',.9);$('slowFr').onclick=()=>speak('fr','fr-FR',.68);
 render();loadCards();
 </script></body></html>
