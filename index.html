@@ -6,7 +6,7 @@
 <section id="cardsSection"><div class="row"><input id="query" placeholder="搜尋卡號、英文名稱" style="flex:1;min-width:200px"><select id="set"><option value="">全部系列</option></select><button id="reload">重新載入卡表</button></div><p id="cardStatus" class="hint">正在嘗試讀取 Riot 官方卡表…</p><div id="gallery" class="grid"></div><div style="text-align:center;margin:20px"><button id="more" class="hide">更多卡片</button></div></section>
 <section id="inventorySection" class="hide"><div class="panel"><h2>📦 我的卡牌倉庫</h2><p class="hint">用完整印刷卡號作為唯一識別碼；數量會先存在本機，登入後可同步到私人 Supabase 帳戶。</p><div class="row"><input id="code" placeholder="卡號，如 OGN-001"><input id="name" placeholder="卡名（選填）"><button id="add" class="primary">＋ 登記一張</button></div><p id="count"></p><input id="inventoryQuery" placeholder="搜尋已收藏卡片"><div id="entries"></div></div><div class="panel"><h2>備份與還原</h2><div class="row"><button id="export">匯出 JSON</button><label>匯入 JSON <input id="import" type="file" accept=".json,application/json"></label></div></div></section>
 <footer class="muted">卡圖與文字歸 Riot Games 所有。本網站是非官方粉絲工具。部分地區瀏覽器可能因 CORS 無法讀取官方 API；未取得的語言文字不會捏造。法文朗讀使用裝置內建語音。</footer></main>
-<dialog id="detail"><div class="detail"><img id="big" alt="卡牌圖片"><div><div class="row" style="justify-content:space-between"><h2 id="detailTitle"></h2><button id="close">關閉 ✕</button></div><p id="meta"></p><div class="panel"><strong>📦 持有數量</strong><div class="row"><button id="minus">－</button><b id="qty">0</b><button id="plus">＋</button></div></div><div class="panel"><b>🇹🇼 繁體中文</b><p id="zh"></p></div><div class="panel"><b>🇬🇧 English</b> <button id="sayEn">🔊</button><p id="en"></p></div><div class="panel"><b>🇫🇷 Français</b> <button id="sayFr">🔊</button><button id="slowFr">🐢 慢速</button><p id="fr"></p></div></div></div></dialog>
+<dialog id="detail"><div class="detail"><img id="big" alt="卡牌圖片"><div><div class="row" style="justify-content:space-between"><h2 id="detailTitle"></h2><button id="close">關閉 ✕</button></div><p id="meta"></p><div class="panel"><strong>📦 持有數量</strong><div class="row"><button id="minus">－</button><b id="qty">0</b><button id="plus">＋</button></div></div><div class="panel"><b>🇹🇼 繁體中文</b><p id="zh"></p></div><div class="panel"><b>🇬🇧 English</b> <button id="sayEn">🔊</button><p id="en"></p></div><div class="panel"><b>🇫🇷 Français</b> <button id="sayFr">🔊</button><button id="slowFr">🐢 慢速</button><button id="translateFr" title="把目前英文卡牌文字翻成法文（非官方翻譯）">🌐 翻成法文</button><p id="fr"></p><small class="hint" id="frNote"></small></div></div></div></dialog>
 <script src="./supabase-config.js"></script><script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const $=id=>document.getElementById(id),STORE='riftbound-atlas-inventory-v1',BASE='https://content.publishing.riotgames.com/publishing-content/v2.0/public/channel/riftbound_website/list/riftbound_gallery_cards';
@@ -37,7 +37,60 @@ async function locale(lang){const response=await fetch(BASE+'?locale='+lang+'&fr
 async function loadCards(){$('cardStatus').textContent='正在載入官方資料…';const results=await Promise.allSettled([locale('en_US'),locale('fr_FR'),locale('zh_TW')]);if(results[0].status!=='fulfilled'){$('cardStatus').textContent='無法直接讀取 Riot 卡表（可能是 CORS）。倉庫仍能使用。';return}cards=results[0].value;fr=mapOf(results[1].status==='fulfilled'?results[1].value:[]);zh=mapOf(results[2].status==='fulfilled'?results[2].value:[]);$('set').innerHTML='<option value="">全部系列</option>';for(const s of [...new Set(cards.map(setOf))].sort()){const o=document.createElement('option');o.value=s;o.textContent=s;$('set').append(o)}showCards(true)}
 function showCards(reset=false){if(reset){const q=$('query').value.toLowerCase(),s=$('set').value;filtered=cards.filter(c=>(!s||setOf(c)===s)&&[c.name,codeOf(c)].some(x=>String(x||'').toLowerCase().includes(q)));shown=0;$('gallery').replaceChildren()}const items=filtered.slice(shown,shown+60);for(const c of items){const el=document.createElement('div');el.className='card';const pic=document.createElement('img');pic.loading='lazy';pic.src=imageOf(c);pic.alt=c.name||codeOf(c);const label=document.createElement('strong');label.textContent=c.name||'Unknown';const num=document.createElement('small');num.textContent=codeOf(c)+' · 📦 '+count(codeOf(c));el.append(pic,label,num);el.onclick=()=>openCard(c);$('gallery').append(el)}shown+=items.length;$('more').classList.toggle('hide',shown>=filtered.length);$('cardStatus').textContent=filtered.length+' cards · FR '+fr.size+' · ZH '+zh.size}
 $('query').oninput=()=>showCards(true);$('set').onchange=()=>showCards(true);$('reload').onclick=loadCards;$('more').onclick=()=>showCards(false);
-function openCard(c){current=c;$('big').src=imageOf(c);$('detailTitle').textContent=c.name||codeOf(c);$('meta').textContent=codeOf(c)+' · '+setOf(c);$('qty').textContent=count(codeOf(c));const f=fr.get(normalize(codeOf(c))),z=zh.get(normalize(codeOf(c)));const enText=textOf(c);const frText=textOf(f);const zhText=textOf(z);const differs=(item,body)=>!!item&&(item.name!==c.name||body!==enText);$('en').textContent=c.name+'\n'+(enText||'此卡未提供效果文字');$('fr').textContent=differs(f,frText)?f.name+'\n'+frText:'⚠️ 此卡尚未取得法文官方原文（資料來源可能退回英文）';$('zh').textContent=differs(z,zhText)?z.name+'\n'+zhText:'⚠️ 此卡尚未取得繁體中文官方原文（資料來源可能退回英文）';$('sayFr').disabled=!differs(f,frText);$('slowFr').disabled=!differs(f,frText);$('detail').showModal()}
+// Community translation fallback. Unofficial machine translations are never labeled official.
+const TRANS_CACHE='riftbound-atlas-french-translations-v1';
+let translated={};
+try{const parsed=JSON.parse(localStorage.getItem(TRANS_CACHE)||'{}');if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))translated=parsed}catch{}
+const hasFrench=(f,c)=>!!f&&(f.name!==c.name||textOf(f)!==textOf(c));
+const renderFrench=async(c)=>{
+  if(current!==c)return;
+  const f=fr.get(normalize(codeOf(c))),english=(c.name||'')+'\n'+textOf(c);
+  if(hasFrench(f,c)){
+    $('fr').textContent=(f.name||'')+'\n'+textOf(f);
+    $('frNote').textContent='官方法文資料';
+    $('translateFr').classList.add('hide');
+    $('sayFr').disabled=false;$('slowFr').disabled=false;return;
+  }
+  $('translateFr').classList.remove('hide');
+  const cached=translated[normalize(codeOf(c))];
+  if(cached&&cached.english===english){
+    $('fr').textContent=cached.french;
+    $('frNote').textContent='⚠️ 第三方機器翻譯，非 Riot 官方法文；卡牌判定請以官方英文為準';
+    $('sayFr').disabled=false;$('slowFr').disabled=false;return;
+  }
+  $('fr').textContent='正在取得法文翻譯…';
+  $('frNote').textContent='無官方法文時使用第三方翻譯；內容可能不準確。';
+  $('sayFr').disabled=true;$('slowFr').disabled=true;
+  await translateFrench(c);
+};
+async function translateFrench(c){
+  const english=(c.name||'')+'\n'+textOf(c);
+  if(!english.trim()||!textOf(c).trim()){
+    if(current===c){$('fr').textContent='無法翻譯：英文效果原文尚未取得';$('frNote').textContent='';}return;
+  }
+  $('translateFr').disabled=true;
+  try{
+    const parts=english.match(/.{1,350}(?:\s|$)|\S.{0,349}/gs)||[english];
+    const translatedParts=[];
+    for(const part of parts){
+      const query='https://api.mymemory.translated.net/get?langpair=en%7Cfr&q='+encodeURIComponent(part.trim());
+      const res=await fetch(query);
+      if(!res.ok)throw Error('HTTP '+res.status);
+      const data=await res.json();
+      if(data.responseStatus!==200||!data.responseData?.translatedText)throw Error(data.responseDetails||'Translation unavailable');
+      const doc=document.createElement('textarea');doc.innerHTML=data.responseData.translatedText;
+      translatedParts.push(doc.value);
+    }
+    const french=translatedParts.join('\n');
+    translated[normalize(codeOf(c))]={english,french};
+    try{localStorage.setItem(TRANS_CACHE,JSON.stringify(translated))}catch{}
+    if(current===c){$('fr').textContent=french;$('frNote').textContent='⚠️ 第三方機器翻譯，非 Riot 官方法文；卡牌判定以官方英文為準';$('sayFr').disabled=false;$('slowFr').disabled=false;}
+  }catch(e){
+    if(current===c){$('fr').textContent='⚠️ 無法取得法文翻譯，請稍後點「翻成法文」重試';$('frNote').textContent='外部翻譯服務可能有連線、配額或 CORS 限制：'+e.message;$('sayFr').disabled=true;$('slowFr').disabled=true;}
+  }finally{$('translateFr').disabled=false}
+}
+$('translateFr').onclick=()=>{if(current)translateFrench(current)};
+function openCard(c){current=c;$('big').src=imageOf(c);$('detailTitle').textContent=c.name||codeOf(c);$('meta').textContent=codeOf(c)+' · '+setOf(c);$('qty').textContent=count(codeOf(c));const z=zh.get(normalize(codeOf(c)));const enText=textOf(c);const zhText=textOf(z);const validChinese=!!z&&(z.name!==c.name||zhText!==enText);$('en').textContent=c.name+'\n'+(enText||'此卡未提供效果文字');$('zh').textContent=validChinese?z.name+'\n'+zhText:'⚠️ 此卡尚未取得繁體中文官方原文';$('detail').showModal();renderFrench(c)}
 $('close').onclick=()=>$('detail').close();$('plus').onclick=()=>current&&setCount(codeOf(current),count(codeOf(current))+1,current.name);$('minus').onclick=()=>current&&setCount(codeOf(current),count(codeOf(current))-1);
 function speak(id,lang,rate){if($(id).textContent.startsWith('⚠️'))return;if(!window.speechSynthesis)return alert('此瀏覽器不支援朗讀');speechSynthesis.cancel();const u=new SpeechSynthesisUtterance($(id).textContent);u.lang=lang;u.rate=rate;speechSynthesis.speak(u)}
 $('sayEn').onclick=()=>speak('en','en-US',.9);$('sayFr').onclick=()=>speak('fr','fr-FR',.9);$('slowFr').onclick=()=>speak('fr','fr-FR',.68);
