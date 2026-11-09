@@ -1,3 +1,6 @@
-// Public Supabase project URL and publishable / anon key only.
-// NEVER paste a service_role or secret key into a public website.
-window.RIFTBOUND_SUPABASE = { url: "https://YOUR_PROJECT.supabase.co", anonKey: "YOUR_SUPABASE_PUBLISHABLE_KEY" };
+// Supabase public project URL and publishable key (safe for browser use with RLS).
+// Never put a Supabase secret / service_role key here.
+window.RIFTBOUND_SUPABASE = {
+  url: "https://lcmvljwlijgpiiyyibsc.supabase.co",
+  anonKey: "sb_publishable_zbutbmxrpkYeO7QvQdwjIw_8X4sncjk"
+};
